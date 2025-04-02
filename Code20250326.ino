@@ -1,4 +1,4 @@
-// Declare time varibles
+// Declare time variables
 
 const unsigned long SECONDS = 1000;
 const unsigned long MINUTES = 60 * SECONDS;
@@ -56,11 +56,11 @@ OneWire oneWire(TEMP_BUS);
 DallasTemperature sensors(&oneWire);
 int numSensors;
 
-const float heat_setpoint = 38.0; // in deg C
+const float heat_setpoint = 37.0; // in deg C
 const float cool_setpoint = 9.0; // in deg C
 const float heat_targetTemp = 36.0; // in deg C
-const float cool_targetTemp = 14.0; // in deg C
-const float max_heat = 41.0; // start cooling if max temp reached * test how long it takes to cool down after turning on
+const float cool_targetTemp = 12.0; // in deg C
+const float max_heat = 40.0; // start cooling if max temp reached * test how long it takes to cool down after turning on
 int maxTempReached = 0;
 int targetTempReached = 0;
 
@@ -92,9 +92,7 @@ void setup() {
   Serial.println("Start!");
 }
 
-void loop() {
-  //tempOutOfRange(); // remove for demonstration
-
+void loop() {  
   // check if e-stop has been pressed
   if (stop_pressed){
     Serial.println("E-STOP PRESSED!");
@@ -188,7 +186,7 @@ void loop() {
     else if (!tempOutOfRange()){ // activate relay if temp within range
       digitalWrite(hc_togglePin, HIGH);
     }
-    if (millis() - hc_prevTime > MAX_TIME_HC){ // check if hc time limit reached 
+    if ((millis() - hc_prevTime > MAX_TIME_HC) and targetTempReached){ // check if hc time limit reached 
       digitalWrite(hc_togglePin, LOW);
       hc_state = 0; // store state as off
       targetTempReached = 0; // ensures timer can start again
@@ -275,8 +273,8 @@ int tempOutOfRange(){ // return true if temperature is out of range
 
   for (int i = 0; i < numSensors; i++){
     temp = sensors.getTempCByIndex(i);
-    Serial.println(temp);
-    //Serial.print(temp); Serial.print(" "); Serial.println(millis());
+    Serial.print("Sensor "); Serial.print(i+1); Serial.print(" : ");
+    Serial.print(temp); Serial.println("*C");
     if (temp > maxTemp){
       maxTemp = temp;
     }
@@ -288,6 +286,7 @@ int tempOutOfRange(){ // return true if temperature is out of range
       if (!targetTempReached and temp > heat_targetTemp){ // start timer when target temp reached
         targetTempReached = 1;
         hc_prevTime = millis();
+        Serial.println("Target temperature reached, start timer.");
         return 0;
       }
       if (temp > max_heat){ // activate cooling if max temp reached
