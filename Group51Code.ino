@@ -56,13 +56,13 @@ OneWire oneWire(TEMP_BUS);
 DallasTemperature sensors(&oneWire);
 int numSensors;
 
-const float heat_setpoint = 37.0; // in deg C
+const float heat_setpoint = 36.0; // in deg C
 const float cool_setpoint = 9.0; // in deg C
 const float heat_targetTemp = 36.0; // in deg C
 const float cool_targetTemp = 12.0; // in deg C
-const float max_heat = 40.0; // start cooling if max temp reached * test how long it takes to cool down after turning on
-int maxTempReached = 0;
-int targetTempReached = 0;
+const float max_heat = 39.5; // start cooling if max temp reached
+int maxTempReached = 0; // track if cooling safety is on
+int targetTempReached = 0; // track when to start timer
 
 void setup() {
   pinMode(e_stop_pin, OUTPUT);
@@ -99,6 +99,7 @@ void loop() {
     
     digitalWrite(hc_togglePin, LOW);
     hc_state = 0;
+    targetTempReached = 0;
     digitalWrite(vibe_pin, LOW);
     vibe_state = 0;
     hcLED(hc_state);
@@ -181,8 +182,6 @@ void loop() {
       digitalWrite(hc_togglePin, LOW);
       //Serial.println("Temperature out of range, pause heating/cooling.");
     }
-
-    // note: set second range for when to reactivate??
     else if (!tempOutOfRange()){ // activate relay if temp within range
       digitalWrite(hc_togglePin, HIGH);
     }
@@ -216,7 +215,7 @@ void checkESTOP(){
 }
 
 void checkVibration(){
-  static unsigned long lastVibeTime = 0; // define once - only for interrupt
+  static unsigned long lastVibeTime = 0; // define once - only for interrupt debounce
   unsigned long currVibeTime = millis(); // update each time
 
   if (currVibeTime - lastVibeTime > debounceDelay){
@@ -268,10 +267,10 @@ void checkFunction(){
 int tempOutOfRange(){ // return true if temperature is out of range
   sensors.requestTemperatures();
   static float temp = 0;
-  float minTemp = 20.0; // initialize to these values bc only values above and below will affect function
+  float minTemp = 20.0; // initialize to these values because only values above and below will affect function
   float maxTemp = 20.0;
 
-  for (int i = 0; i < numSensors; i++){
+  for (int i = 0; i < numSensors; i++){ // works for when mutlptile sensors are added in future versions
     temp = sensors.getTempCByIndex(i);
     Serial.print("Sensor "); Serial.print(i+1); Serial.print(" : ");
     Serial.print(temp); Serial.println("*C");
@@ -288,13 +287,14 @@ int tempOutOfRange(){ // return true if temperature is out of range
         hc_prevTime = millis();
         Serial.println("Target temperature reached, start timer.");
         return 0;
+        //return 1; // turn off relay for overshoot
       }
       if (temp > max_heat){ // activate cooling if max temp reached
         digitalWrite(hc_functionPin, LOW); // heating circuit will aready be off when this flips
         maxTempReached = 1; // track if saftey cooling is running
         return 0;
       }
-      if (temp > heat_setpoint){ // deactivate heating if setpoint reached
+      if (temp > heat_setpoint and !maxTempReached){ // deactivate heating if setpoint reached
         return 1;
       }
     }
